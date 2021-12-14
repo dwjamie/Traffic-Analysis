@@ -1,0 +1,1 @@
+各省人口数据由维基百科获取，GDP、GDP增长率等数据由https://www.maigoo.com/news/480543.html网站获取。

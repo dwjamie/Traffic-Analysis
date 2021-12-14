@@ -1,0 +1,282 @@
+---
+title: "可视化"
+author: "杨宝旭 2018200453"
+date: "2021/5/30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r message=FALSE, warning=FALSE}
+#绘制交互式气泡图
+# 加载
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(viridis)
+library(hrbrthemes) 
+dat1 = read.csv('provincial_flows_1gbk.csv')
+d = read.csv('d.csv')
+dat1 = na.omit(dat1)
+dat1 = join(dat1,d,by='省份')
+dat1$行政地理分区 = as.factor(dat1$行政地理分区)
+
+plot <- ggplot(dat1, aes(x=流入人次, y=流出人次, size = GDP, color = PageRank重要性, text=省份)) +
+  geom_point(alpha=0.7) +
+  scale_size(range = c(1.4, 19), name="行政地理分区") +
+ scale_color_gradient(low="white",high="red")+
+  #scale_color_viridis(discrete=FALSE, guide=FALSE) +
+  theme_ipsum() +
+  theme()
+# 1. 先将ggplot图形转换为交互式图形
+pp <- ggplotly(plot, tooltip="text")
+pp
+# 利用saveWidget函数保存交互式图形
+library(htmlwidgets)
+saveWidget(pp, file=  "GDPBubblechart2.html")
+plot
+```
+
+```{r message=FALSE, warning=FALSE}
+#绘制哑铃图
+dat2 = read.csv('清明节比较gbk.csv')
+dat2$年份 = as.factor(dat2$年份)
+
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(viridis)
+library(hrbrthemes) 
+p1 <- ggplot(dat2, aes(流入人次,省份,col=行政地理分区,shape=年份)) +
+  geom_line(aes(group = 省份,col=行政地理分区)) +#划线
+  geom_point(size=3)+ #设置点
+  scale_fill_manual(values=c("#00AFBB", "#FC4E07","#36BED9"))+ #设置填充色
+  #xlim(3.7,4.1)+xlab('流入人次')+
+  theme()+theme_ipsum();p1
+
+pp <- p1 %>% 
+  ggplotly(tooltip="text")%>% ##adding the text in the tooltip
+  style(hoverlabel = list(bgcolor = "white"), hoveron = "fill") %>%
+  plotly_build()
+library(htmlwidgets)
+saveWidget(pp, file="哑铃图.html")
+```
+
+
+```{r}
+#绘制地图热力图
+library(mapdata)
+library(maptools)
+library(rgdal)
+library(mapproj)
+library(ggplot2)
+library(tidyverse)
+library(plotly)
+library(viridis)
+library(hrbrthemes) 
+library(plyr) #载入plyr包
+china_map <- rgdal::readOGR("bou2_4p.shp")
+ggplot(china_map,aes(x=long,y=lat,group=group))+
+  geom_polygon(fill='white',colour='black')+
+  coord_map('polyconic')+
+  theme(
+    panel.grid = element_blank(),panel.background=element_blank(),
+    axis.text=element_blank(),axis.ticks=element_blank(),
+    axis.title = element_blank(),
+    legend.position = c(0.2,0.3)
+  )
+```
+
+
+```{r}
+dat4 = read.csv("各省.csv")
+dat4$NAME = dat4$省份
+dat4 = dat4[(dat4$月份==2)|(dat4$月份==3)|(dat4$月份==4)
+            |(dat4$月份==5)|(dat4$月份==6),]
+dat41 = dat4
+x <- china_map@data
+
+pro_label <- c('上海市','云南省','内蒙古自治区','北京市','吉林省','四川省',
+               '天津市','宁夏回族自治区','安徽省','山东省','山西省','广东省',
+               '广西壮族自治区','新疆维吾尔自治区','江苏省','江西省','河北省','河南省',
+               '浙江省','海南省','湖北省','湖南省','甘肃省','福建省',
+               '西藏自治区','贵州省','辽宁省','重庆市','陕西省','青海省',
+               '黑龙江省')
+
+```
+
+```{r}
+x <- china_map@data
+xs <- data.frame(x, id = seq(0:924) -1)# 地图中共计有925个地域信息
+china_map1 <- fortify(china_map)
+china_map_data <- join(china_map1, xs,type = "full")# 基于id进行连接 unique(china_map@data$NAME)# 查看地图数据中保存的地域名称，编辑自己的数据与其一致
+#基于NAME字段进行连接，NAME字段来自于地图文件中
+china_data <- join(china_map_data,dat4, 
+                   type = "full",by='NAME')
+china_data = na.omit(china_data)
+
+p1 <- ggplot()+
+ geom_polygon(data=china_data,aes(x=long,y=lat,group=group,fill =流入人次,frame=月份,text = paste0("省份: ", 省份,"月份: ", 月份, "\n",
+                        "流入人次: ", 流入人次)),
+              colour="black",size=0.1)+
+ scale_fill_gradient(low="white",high="red")+
+  #facet_grid(.~月份)+
+ coord_map("polyconic")+
+ theme(
+   panel.grid=element_blank(),
+   panel.background=element_blank(),
+   axis.text=element_blank(),
+   axis.ticks=element_blank(),
+   axis.title=element_blank()
+  )##参数“HS”为换手率，基于该指标绘制热力图
+
+p_map1 <- p1 %>%
+  ggplotly(tooltip = "text") %>% ##adding the text in the tooltip
+  style(hoverlabel = list(bgcolor = "white"), hoveron = "fill") %>%
+  plotly_build()
+p_map1$x$frames <- lapply(
+  p_map1$x$frames, function(f) { 
+    f$data <- lapply(f$data, function(d) d[!names(d) %in% c("x", "y")])
+    f 
+  })
+#Adding animation bar
+p_map1 %>% 
+  animation_button(
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "Month Year ", font = list(color="red"))
+  )
+#fig <- ggplotly(p1, tooltip="text")
+library(htmlwidgets)
+saveWidget(p_map1, file= "p_map1.html")
+```
+
+```{r}
+x <- china_map@data
+xs <- data.frame(x, id = seq(0:924) -1)# 地图中共计有925个地域信息
+china_map1 <- fortify(china_map)
+china_map_data <- join(china_map1, xs,type = "full")# 基于id进行连接 unique(china_map@data$NAME)# 查看地图数据中保存的地域名称，编辑自己的数据与其一致
+#基于NAME字段进行连接，NAME字段来自于地图文件中
+china_data <- join(china_map_data,dat4, 
+                   type = "full",by='NAME')
+china_data = na.omit(china_data)
+
+p1 <- ggplot()+
+ geom_polygon(data=china_data,aes(x=long,y=lat,group=group,fill =流出人次,frame=月份,text = paste0("省份: ", 省份,"月份: ", 月份, "\n",
+                        "流出人次: ", 流出人次)),
+              colour="black",size=0.1)+
+ scale_fill_gradient(low="white",high="red")+
+  #facet_grid(.~月份)+
+ coord_map("polyconic")+
+ theme(
+   panel.grid=element_blank(),
+   panel.background=element_blank(),
+   axis.text=element_blank(),
+   axis.ticks=element_blank(),
+   axis.title=element_blank()
+  )##参数“HS”为换手率，基于该指标绘制热力图
+
+p_map2 <- p1 %>%
+  ggplotly(tooltip = "text") %>% ##adding the text in the tooltip
+  style(hoverlabel = list(bgcolor = "white"), hoveron = "fill") %>%
+  plotly_build()
+p_map2$x$frames <- lapply(
+  p_map2$x$frames, function(f) { 
+    f$data <- lapply(f$data, function(d) d[!names(d) %in% c("x", "y")])
+    f 
+  })
+#Adding animation bar
+p_map2 %>% 
+  animation_button(
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "Month Year ", font = list(color="red"))
+  )
+#fig <- ggplotly(p1, tooltip="text")
+library(htmlwidgets)
+saveWidget(p_map2, file= "p_map2.html")
+```
+
+```{r}
+x <- china_map@data
+xs <- data.frame(x, id = seq(0:924) -1)# 地图中共计有925个地域信息
+china_map1 <- fortify(china_map)
+china_map_data <- join(china_map1, xs,type = "full")# 基于id进行连接 unique(china_map@data$NAME)# 查看地图数据中保存的地域名称，编辑自己的数据与其一致
+#基于NAME字段进行连接，NAME字段来自于地图文件中
+china_data <- join(china_map_data,dat4, 
+                   type = "full",by='NAME')
+china_data = na.omit(china_data)
+
+p1 <- ggplot()+
+ geom_polygon(data=china_data,aes(x=long,y=lat,group=group,fill =内部流动人次,frame=月份,text = paste0("省份: ", 省份,"月份: ", 月份, "\n",
+                        "内部流动人次: ", 内部流动人次)),
+              colour="black",size=0.1)+
+ scale_fill_gradient(low="white",high="red")+
+  #facet_grid(.~月份)+
+ coord_map("polyconic")+
+ theme(
+   panel.grid=element_blank(),
+   panel.background=element_blank(),
+   axis.text=element_blank(),
+   axis.ticks=element_blank(),
+   axis.title=element_blank()
+  )##参数“HS”为换手率，基于该指标绘制热力图
+
+p_map3 <- p1 %>%
+  ggplotly(tooltip = "text") %>% ##adding the text in the tooltip
+  style(hoverlabel = list(bgcolor = "white"), hoveron = "fill") %>%
+  plotly_build()
+p_map3$x$frames <- lapply(
+  p_map3$x$frames, function(f) { 
+    f$data <- lapply(f$data, function(d) d[!names(d) %in% c("x", "y")])
+    f 
+  })
+#Adding animation bar
+p_map3 %>% 
+  animation_button(
+    x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "Month Year ", font = list(color="red"))
+  )
+#fig <- ggplotly(p1, tooltip="text")
+library(htmlwidgets)
+saveWidget(p_map3, file= "p_map3.html")
+```
+
+```{r}
+library(plyr)
+pg = read.csv("PageRank.csv")
+d = ddply(pg,.(省份),summarize,
+          PageRank重要性=max(PageRank))
+write.csv(d,'d.csv')
+```
+
+```{r}
+dd = read.csv("china_provincedatagbk.csv")
+dd = na.omit(dd)
+dd = dd[dd$日期>20200200,]
+dd = dd[dd$日期<20200700,]
+dd$省份[dd$省份=='香港']='香港特别行政区'
+dd$省份[dd$省份=='澳门']='澳门特别行政区'
+dd = na.omit(dd)
+dd1 = dd[dd$日=='1',]
+dde = dd[dd$日=='29',]
+rownames(dd1) = (1:160)
+rownames(dde) = (1:160)
+dd1$月累积新增感染 = (dde$累计确诊-dd1$累计确诊)
+#write.csv(dd1,'感染情况.csv')
+dd = read.csv('感染情况.csv')
+month = read.csv('月份变化.csv')
+month$id = paste(month$省份,month$月份)
+dd$id = paste(dd$省份,dd$月份)
+c = merge(month,dd,by=c('id'))
+write.csv(c,'月份变化2.csv')
+```
+

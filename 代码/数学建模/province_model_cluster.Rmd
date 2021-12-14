@@ -1,0 +1,79 @@
+---
+title: "省份聚类分析"
+author: "张子琪_2018202065"
+date: "2021/6/1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 数据
+
+```{r }
+data = read.csv("F:/大三下/并行计算与软件设计/大作业/数据/Province.csv",
+                fileEncoding='utf-8',stringsAsFactors = F)
+library(factoextra)
+
+# 数据进行标准化
+X=data[,-c(1,19)]
+X=X[,-c(18,19)]
+X=as.data.frame(lapply(X,as.numeric)) 
+df =as.data.frame(scale(X))
+
+
+#确定最佳聚类数目
+fviz_nbclust(df, kmeans, method = "wss") + geom_vline(xintercept = 4, linetype = 2)
+```
+
+
+## 模型
+
+```{r }
+#可以发现聚为四类最合适，当然这个没有绝对的，从指标上看，选择坡度变化不明显的点最为最佳聚类数目。
+#设置随机数种子，保证实验的可重复进行
+set.seed(123)
+#利用k-mean是进行聚类
+km_result <- kmeans(df, 4, nstart = 24)
+#查看聚类的一些结果
+print(km_result)
+#提取类标签并且与原始数据进行合并
+dd <- cbind(data, cluster = km_result$cluster)
+head(dd)
+
+#查看每一类的数目
+table(dd$cluster)
+
+#进行可视化展示
+fviz_cluster(km_result, data = df,
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+             ellipse.type = "euclid",
+             star.plot = TRUE, 
+             repel = TRUE,
+             ggtheme = theme_minimal()
+)
+
+
+```
+
+```{r }
+show=dd[,c(1,24)]
+show=show[order(show$cluster),]
+show
+GDP=c()
+GDPg=c()
+for (i in c(1:4)) {
+  GDP=c(GDP,mean(dd[dd$cluster==i,20]))
+  GDPg=c(GDPg,mean(dd[dd$cluster==i,21]))
+}
+res=data.frame(类别=c(1:4),GDP=GDP,GDP增速=GDPg)
+res
+```
+
+```{r }
+print(show[show$cluster==1,1])
+print(show[show$cluster==2,1])
+print(show[show$cluster==3,1])
+print(show[show$cluster==4,1])
+```
